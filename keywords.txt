@@ -1,0 +1,45 @@
+#######################################
+# Syntax Coloring Map For DFRobot_MAX98357A
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+DFRobot_MAX98357A	KEYWORD1
+Biquad	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin	KEYWORD2
+initI2S	KEYWORD2
+initBluetooth	KEYWORD2
+initSDCard	KEYWORD2
+
+scanSDMusic	KEYWORD2
+playSDMusic	KEYWORD2
+SDPlayerControl	KEYWORD2
+
+getMetadata	KEYWORD2
+getRemoteAddress	KEYWORD2
+
+setVolume	KEYWORD2
+openFilter	KEYWORD2
+closeFilter	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+I2S_NUM_0	LITERAL1
+NUMBER_OF_FILTER	LITERAL1
+SD_AMPLIFIER_PLAY	LITERAL1
+SD_AMPLIFIER_PAUSE	LITERAL1
+SD_AMPLIFIER_STOP	LITERAL1
+bq_type_highpass	LITERAL1
+bq_type_lowpass	LITERAL1
+ESP_AVRC_MD_ATTR_TITLE	LITERAL1
+ESP_AVRC_MD_ATTR_ARTIST	LITERAL1
+ESP_AVRC_MD_ATTR_ALBUM	LITERAL1
