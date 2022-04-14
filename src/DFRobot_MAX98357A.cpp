@@ -21,6 +21,7 @@ bool _filterFlag = false;   // Filter enabling flag
 
 String _metadata = "";   // metadata
 uint8_t _metaFlag = 0;   // metadata refresh flag
+uint8_t _voiceSource = MAX98357A_VOICE_FROM_BT;   // The audio source, used to correct left and right audio
 
 Biquad _filterLLP[NUMBER_OF_FILTER];   // Left channel low-pass filter
 Biquad _filterRLP[NUMBER_OF_FILTER];   // Right channel low-pass filter
@@ -193,6 +194,7 @@ bool DFRobot_MAX98357A::initBluetooth(const char * _btName)
     DBG("Set discoverability and connectability mode for legacy bluetooth failed !");
     return false;
   }
+  _voiceSource = MAX98357A_VOICE_FROM_BT;
 
   return true;
 }
@@ -226,6 +228,8 @@ bool DFRobot_MAX98357A::initSDCard(uint8_t csPin)
   DBG(cardSize);
   // Serial.printf("SD Card Size: %lluMB\n", cardSize);
 
+  _voiceSource = MAX98357A_VOICE_FROM_SD;
+
   SDAmplifierMark = SD_AMPLIFIER_STOP;
   xTaskCreate(&playWAV, "playWAV", 2048, NULL, 5, &xPlayWAV);
 
@@ -233,6 +237,11 @@ bool DFRobot_MAX98357A::initSDCard(uint8_t csPin)
 }
 
 /*************************** Function ******************************/
+
+void DFRobot_MAX98357A::reverseLeftRightChannels(void)
+{
+  _voiceSource = (_voiceSource ? MAX98357A_VOICE_FROM_SD : MAX98357A_VOICE_FROM_BT);
+}
 
 void DFRobot_MAX98357A::listDir(fs::FS &fs, const char * dirName)
 {
@@ -479,20 +488,22 @@ void DFRobot_MAX98357A::audioDataProcessCallback(const uint8_t *data, uint32_t l
 
   if(!_filterFlag){   // Change sample data only according to volume multiplier
     for(int i=0; i<count; i++){
-      processedData[0] = (int16_t)((*data16) * _volume);   // Change audio data volume of left channel
+      processedData[0+_voiceSource] = (int16_t)((*data16) * _volume);   // Change audio data volume of left channel
+      DBG(processedData[0], HEX);
       data16++;
 
-      processedData[1] = (int16_t)((*data16) * _volume);   // Change audio data volume of right channel
+      processedData[1-_voiceSource] = (int16_t)((*data16) * _volume);   // Change audio data volume of right channel
+      DBG(processedData[1], HEX);
       data16++;
 
       i2s_write(I2S_NUM_0,  processedData, 4, &i2s_bytes_write, 20);   // Transfer audio data to the amplifier via I2S
     }
   }else{   // Filtering with a simple digital filter
     for(int i=0; i<count; i++){
-      processedData[0] = filterToWork(_filterLHP, _filterLLP, ((*data16) * _volume));   // Change audio data volume of left channel, and perform filtering operation
+      processedData[0+_voiceSource] = filterToWork(_filterLHP, _filterLLP, ((*data16) * _volume));   // Change audio data volume of left channel, and perform filtering operation
       data16++;
 
-      processedData[1] = filterToWork(_filterRHP, _filterRLP, ((*data16) * _volume));   // Change audio data volume of right channel, and perform filtering operation
+      processedData[1-_voiceSource] = filterToWork(_filterRHP, _filterRLP, ((*data16) * _volume));   // Change audio data volume of right channel, and perform filtering operation
       data16++;
 
       i2s_write(I2S_NUM_0, processedData, 4, &i2s_bytes_write, 100);   // Transfer audio data to the amplifier via I2S

@@ -61,6 +61,13 @@ void setup(void)
   Serial.println("Initialize succeed!");
 
   /**
+   * @fn reverseLeftRightChannels
+   * @brief Reverse left and right channels, When you find that the left
+   * @n  and right channels play opposite, you can call this interface to adjust
+   */
+  // amplifier.reverseLeftRightChannels();
+
+  /**
    * @brief Scan the music files in WAV format in the SD card
    * @param musicList - The music files in .wav format scanned from the SD card. Type is character string array.
    * @return None

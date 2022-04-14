@@ -39,6 +39,13 @@ void setup(void)
   Serial.println("Initialize succeed!");
 
   /**
+   * @fn reverseLeftRightChannels
+   * @brief Reverse left and right channels, When you find that the left
+   * @n  and right channels play opposite, you can call this interface to adjust
+   */
+  // amplifier.reverseLeftRightChannels();
+
+  /**
    * @brief Set volume
    * @param vol - Set volume, the range can be set to 0-9
    * @note 5 for the original volume of audio data, no increase or decrease

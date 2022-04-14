@@ -155,6 +155,14 @@ To use this library, first download the library file, paste it into the \Arduino
    */
   void closeFilter(void);
 
+  /**
+   * @fn reverseLeftRightChannels
+   * @brief Reverse left and right channels, When you find that the left
+   * @n  and right channels play opposite, you can call this interface to adjust
+   * @return None
+   */
+  void reverseLeftRightChannels(void);
+
 ```
 
 

@@ -40,6 +40,9 @@
 #define SD_AMPLIFIER_PAUSE ((uint8_t)2)   //!< Playback control of audio in SD card - pause playback
 #define SD_AMPLIFIER_STOP  ((uint8_t)3)   //!< Playback control of audio in SD card - stop playback
 
+#define MAX98357A_VOICE_FROM_SD ((uint8_t)0)
+#define MAX98357A_VOICE_FROM_BT ((uint8_t)1)
+
 class DFRobot_MAX98357A
 {
 public:
@@ -174,6 +177,14 @@ public:
    * @return None
    */
   void closeFilter(void);
+
+  /**
+   * @fn reverseLeftRightChannels
+   * @brief Reverse left and right channels, When you find that the left
+   * @n  and right channels play opposite, you can call this interface to adjust
+   * @return None
+   */
+  void reverseLeftRightChannels(void);
 
 protected:
 
