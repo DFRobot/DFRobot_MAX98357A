@@ -109,7 +109,7 @@ close the audio filter
    * @param CMD - Playback control command: 
    * @n SD_AMPLIFIER_PLAY: Start to play music, which can be played from the position where you paused before
    * @n   If no music file is selected through playSDMusic(), the first one in the list will be played by default.
-   * @n   Playback error may occur if music files are not scanned from SD card in the correct format (only support English for path name of music files and WVA for their format currently)
+   * @n   Playback error may occur if music files are not scanned from SD card in the correct format (only support English for path name of music files and WAV for their format currently)
    * @n SD_AMPLIFIER_PAUSE: Pause playback, keep the playback position of the current music file
    * @n SD_AMPLIFIER_STOP: Stop playback, end the current music playback
    * @return None
@@ -242,7 +242,7 @@ void parseSerialCommand(void)
        * @param CMD - Playback control command: 
        * @n SD_AMPLIFIER_PLAY: Start to play music, which can be played from the position where you paused before
        * @n   If no music file is selected through playSDMusic(), the first one in the list will be played by default.
-       * @n   Playback error may occur if music files are not scanned from SD card in the correct format (only support English for path name of music files and WVA for their format currently)
+       * @n   Playback error may occur if music files are not scanned from SD card in the correct format (only support English for path name of music files and WAV for their format currently)
        * @n SD_AMPLIFIER_PAUSE: pause playback, keep the playback position of the current music file
        * @n SD_AMPLIFIER_STOP: stop playback, end the current music playback
        * @return None

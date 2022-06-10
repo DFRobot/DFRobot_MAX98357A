@@ -83,7 +83,7 @@ To use this library, first download the library file, paste it into the \Arduino
    * @brief Scan the music files in WAV format in the SD card
    * @param musicList - The music files in WAV format scanned from the SD card. Type: character string array.
    * @return None
-   * @note Only support English for path name of music files and WVA for their format currently.
+   * @note Only support English for path name of music files and WAV for their format currently.
    */
   void scanSDMusic(String * musicList);
 
@@ -93,7 +93,7 @@ To use this library, first download the library file, paste it into the \Arduino
    * @param Filename - music file name, only support the music files in .wav format currently
    * @note Music file name must be an absolute path like /musicDir/music.wav
    * @return None
-   * @note Only support English for path name of music files and WVA for their format currently.
+   * @note Only support English for path name of music files and WAV for their format currently.
    */
   void playSDMusic(const char *Filename);
 
@@ -103,7 +103,7 @@ To use this library, first download the library file, paste it into the \Arduino
    * @param CMD - playback control command: 
    * @n SD_AMPLIFIER_PLAY: start to play music, which can be played from the position where you paused before
    * @n   If no music file is selected through playSDMusic(), the first one in the playlist will be played by default.
-   * @n   Playback error may occur if music files are not scanned from SD card in the correct format (only support English for path name of music files and WVA for their format currently)
+   * @n   Playback error may occur if music files are not scanned from SD card in the correct format (only support English for path name of music files and WAV for their format currently)
    * @n SD_AMPLIFIER_PAUSE: pause playback, retain the playback position of the current music file
    * @n SD_AMPLIFIER_STOP: stop playback, end the current music playback
    * @return None

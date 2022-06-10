@@ -83,7 +83,7 @@
    * @brief 扫描SD卡里面的WAV格式的音乐文件
    * @param musicList - SD卡里面扫描到的WAV格式的音乐文件, 类型是字符串数组
    * @return None
-   * @note 音乐文件路径名字当前仅支持英文, 格式当前仅支持WVA格式的音乐文件
+   * @note 音乐文件路径名字当前仅支持英文, 格式当前仅支持WAV格式的音乐文件
    */
   void scanSDMusic(String * musicList);
 
@@ -93,7 +93,7 @@
    * @param Filename - 音乐文件名, 当前仅支持 .wav 格式的音频文件
    * @note 音乐文件名需为绝对路径, 列如: /musicDir/music.wav
    * @return None
-   * @note 音乐文件路径名字当前仅支持英文, 格式当前仅支持WVA格式的音乐文件
+   * @note 音乐文件路径名字当前仅支持英文, 格式当前仅支持WAV格式的音乐文件
    */
   void playSDMusic(const char *Filename);
 
@@ -103,7 +103,7 @@
    * @param CMD - 播放控制命令: 
    * @n SD_AMPLIFIER_PLAY: 开始播放音乐, 可从之前暂停播放的位置继续播放
    * @n   若没有通过playSDMusic()选择播放的音乐文件, 会默认播放音乐列表第一首
-   * @n   若SD卡没有扫描到正确格式的音乐文件也会播放失败(音乐文件路径名字当前仅支持英文, 格式当前仅支持WVA格式的音乐文件)
+   * @n   若SD卡没有扫描到正确格式的音乐文件也会播放失败(音乐文件路径名字当前仅支持英文, 格式当前仅支持WAV格式的音乐文件)
    * @n SD_AMPLIFIER_PAUSE: 暂停播放, 保留当前音乐文件的播放位置
    * @n SD_AMPLIFIER_STOP: 停止播放, 结束当前音乐的播放
    * @return None
