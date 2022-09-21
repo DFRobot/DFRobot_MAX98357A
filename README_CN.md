@@ -7,7 +7,7 @@
 ![产品实物图](./resources/images/MAX98357A.png)
 
 
-## 产品链接 (https://www.dfrobot.com.cn/)
+## 产品链接 (https://www.dfrobot.com.cn/goods-3573.html)
     SKU: DFR0954
 
 
@@ -176,6 +176,7 @@ FireBeetle-ESP32   |      √       |              |             |
 ## 历史
 
 - 2022/02/07 - 1.0.0 版本
+- 2022/09/21 - 1.0.1 版本
 
 
 ## 创作者

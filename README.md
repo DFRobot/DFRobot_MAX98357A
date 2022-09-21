@@ -7,7 +7,7 @@ This is a small and easy-to-use MAX98357A I2S amplifier. In combination with ESP
 ![产品实物图](./resources/images/MAX98357A.png)
 
 
-## Product Link (https://www.dfrobot.com/)
+## Product Link (https://www.dfrobot.com/product-2614.html)
     SKU: DFR0954
 
 
@@ -176,6 +176,7 @@ FireBeetle-ESP32   |      √       |              |             |
 ## History
 
 - 2022/02/07 - Version 1.0.0 released.
+- 2022/09/21 - Version 1.0.1 released.
 
 
 ## Credits
