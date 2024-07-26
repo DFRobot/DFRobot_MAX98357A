@@ -69,9 +69,9 @@ public:
    * @return true on success, false on error
    */
   bool begin(const char *btName="bluetoothAmplifier", 
-             int bclk=GPIO_NUM_25, 
-             int lrclk=GPIO_NUM_26, 
-             int din=GPIO_NUM_27);
+             int bclk=25, 
+             int lrclk=26, 
+             int din=27);
 
   /**
    * @fn initI2S
@@ -97,7 +97,7 @@ public:
    * @param csPin cs pin number for spi communication of SD card module
    * @return true on success, false on error
    */
-  bool initSDCard(uint8_t csPin=GPIO_NUM_5);
+  bool initSDCard(uint8_t csPin=5);
 
 /*************************** Function ******************************/
 
