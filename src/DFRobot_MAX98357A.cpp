@@ -356,7 +356,7 @@ void DFRobot_MAX98357A::setFilter(Biquad * _filter, int _type, float _fc)
 {
   _fc = (constrain(_fc, 2.0, 20000.0)) / (float)_sampleRate;   // Ratio of filter threshold to sampling frequency, range: 0.0-0.5
   float Q;
-  for(int i; i<NUMBER_OF_FILTER; i++){
+  for(int i=0; i<NUMBER_OF_FILTER; i++){
     Q = 1 / (2 * cos( PI / (NUMBER_OF_FILTER * 4) + i * PI / (NUMBER_OF_FILTER * 2) ));
     DBG("\n-------- Q ");
     DBG(Q);
@@ -370,11 +370,11 @@ void DFRobot_MAX98357A::setFilter(Biquad * _filter, int _type, float _fc)
 
 int16_t DFRobot_MAX98357A::filterToWork(Biquad * filterHP, Biquad * filterLP, float rawData)
 {
-  for(int i; i<NUMBER_OF_FILTER; i++){
+  for(int i=0; i<NUMBER_OF_FILTER; i++){
     rawData = filterLP[i].process(rawData);
   }
 
-  for(int i; i<NUMBER_OF_FILTER; i++){
+  for(int i=0; i<NUMBER_OF_FILTER; i++){
     rawData = filterHP[i].process(rawData);
   }
 
