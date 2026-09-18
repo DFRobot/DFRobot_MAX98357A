@@ -11,6 +11,83 @@
  * @url  https://github.com/DFRobot/DFRobot_MAX98357A
  */
 #include "DFRobot_MAX98357A.h"
+#include <freertos/semphr.h>
+
+// Recent cores release unused Bluetooth memory before setup(). Declare Classic
+// usage before app_main(), just as the core's BluetoothSerial library does.
+#if __has_include("esp32-hal-alloc-bt-classic-mem.h")
+#include "esp32-hal-alloc-bt-classic-mem.h"
+#endif
+
+// IDF 5's channel driver must never be mixed with the legacy I2S driver.
+namespace {
+bool initializationOK(const char *stage, esp_err_t error)
+{
+  if (error == ESP_OK) return true;
+  Serial.printf("[MAX98357A] %s failed: %s (0x%x)\n",
+                stage, esp_err_to_name(error), static_cast<unsigned int>(error));
+  return false;
+}
+#if ESP_IDF_VERSION_MAJOR >= 5
+  i2s_chan_handle_t txChannel = nullptr;
+  SemaphoreHandle_t i2sMutex = nullptr;
+#endif
+
+esp_err_t writeAudio(const void *data, size_t size, size_t *written, TickType_t timeout)
+{
+#if ESP_IDF_VERSION_MAJOR >= 5
+  *written = 0;
+  if (!i2sMutex || xSemaphoreTake(i2sMutex, timeout) != pdTRUE) {
+    return ESP_ERR_TIMEOUT;
+  }
+  // The old driver takes RTOS ticks; the channel API takes milliseconds.
+  esp_err_t err = txChannel
+      ? i2s_channel_write(txChannel, data, size, written, timeout * portTICK_PERIOD_MS)
+      : ESP_ERR_INVALID_STATE;
+  xSemaphoreGive(i2sMutex);
+  return err;
+#else
+  return i2s_write(I2S_NUM_0, data, size, written, timeout);
+#endif
+}
+
+esp_err_t setAudioSampleRate(uint32_t rate)
+{
+#if ESP_IDF_VERSION_MAJOR >= 5
+  if (!rate || !i2sMutex) return ESP_ERR_INVALID_ARG;
+  if (xSemaphoreTake(i2sMutex, pdMS_TO_TICKS(1000)) != pdTRUE) return ESP_ERR_TIMEOUT;
+  esp_err_t err = txChannel ? i2s_channel_disable(txChannel) : ESP_ERR_INVALID_STATE;
+  if (err == ESP_OK) {
+    i2s_std_clk_config_t clock = I2S_STD_CLK_DEFAULT_CONFIG(rate);
+    err = i2s_channel_reconfig_std_clock(txChannel, &clock);
+    // Restore the running state even when reconfiguration fails.
+    esp_err_t enableError = i2s_channel_enable(txChannel);
+    if (err == ESP_OK) err = enableError;
+  }
+  xSemaphoreGive(i2sMutex);
+  return err;
+#else
+  return i2s_set_sample_rates(I2S_NUM_0, rate);
+#endif
+}
+
+void releaseAudio()
+{
+#if ESP_IDF_VERSION_MAJOR >= 5
+  if (!i2sMutex) return;
+  xSemaphoreTake(i2sMutex, portMAX_DELAY);
+  if (txChannel) {
+    i2s_channel_disable(txChannel);
+    i2s_del_channel(txChannel);
+    txChannel = nullptr;
+  }
+  // Keep the mutex alive: a callback may already be waiting for it.
+  xSemaphoreGive(i2sMutex);
+#else
+  i2s_driver_uninstall(I2S_NUM_0);
+#endif
+}
+} // namespace
 
 uint8_t DFRobot_MAX98357A::remoteAddress[6];   // Address of the connected remote Bluetooth device
 
@@ -30,7 +107,7 @@ Biquad _filterRHP[NUMBER_OF_FILTER];   // Right channel high-pass filter
 
 char fileName[100];
 uint8_t SDAmplifierMark = SD_AMPLIFIER_STOP;   // SD card play flag
-xTaskHandle xPlayWAV = NULL;   // SD card play Task
+TaskHandle_t xPlayWAV = NULL;   // SD card play Task
 String _musicList[100];   // SD card music list
 uint8_t musicCount = 0;   // SD card music count
 
@@ -46,11 +123,11 @@ typedef struct
     char                  formatType[4];
     unsigned int          formatSize;
     uint16_t              compressionCode;
-    i2s_channel_t         numChannels;
+    uint16_t              numChannels;
     uint32_t              sampleRate;
     unsigned int          bytesPerSecond;
     unsigned short        blockAlign;
-    i2s_bits_per_sample_t bitsPerSample;
+    uint16_t              bitsPerSample;
     char                  dataType1[1];
     char                  dataType2[3];
     unsigned int          dataSize;
@@ -84,6 +161,7 @@ bool DFRobot_MAX98357A::begin(const char *btName, int bclk, int lrclk, int din)
   // Initialize bluetooth
   if (!initBluetooth(btName)){
     DBG("Initialize bluetooth failed !");
+    releaseAudio();
     return false;
   }
 
@@ -103,12 +181,51 @@ void DFRobot_MAX98357A::end(void)
   ESP_ERROR_CHECK(esp_bluedroid_disable());   // stop & destroy bluetooth
   ESP_ERROR_CHECK(esp_bluedroid_deinit());
   btStop();
-  ESP_ERROR_CHECK(i2s_driver_uninstall(I2S_NUM_0));   // stop & destroy i2s driver
+  releaseAudio();   // stop & destroy the selected I2S driver
 }
 
 bool DFRobot_MAX98357A::initI2S(int _bclk, int _lrclk, int _din)
 {
-  static const i2s_config_t i2s_config = {
+#if ESP_IDF_VERSION_MAJOR >= 5
+  if (!i2sMutex) i2sMutex = xSemaphoreCreateMutex();
+  if (!i2sMutex) return initializationOK("I2S mutex allocation", ESP_ERR_NO_MEM);
+  xSemaphoreTake(i2sMutex, portMAX_DELAY);
+  if (txChannel) {
+    xSemaphoreGive(i2sMutex);
+    return initializationOK("I2S channel already active", ESP_ERR_INVALID_STATE);
+  }
+
+  i2s_chan_config_t channel = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
+  channel.dma_desc_num = 4;
+  channel.dma_frame_num = 400;
+  channel.auto_clear = true;
+  i2s_std_config_t config = {};
+  config.clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(static_cast<uint32_t>(_sampleRate));
+  config.slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO);
+  config.gpio_cfg.mclk = I2S_GPIO_UNUSED;
+  config.gpio_cfg.bclk = static_cast<gpio_num_t>(_bclk);
+  config.gpio_cfg.ws = static_cast<gpio_num_t>(_lrclk);
+  config.gpio_cfg.dout = static_cast<gpio_num_t>(_din);
+  config.gpio_cfg.din = I2S_GPIO_UNUSED;
+
+  const char *stage = "i2s_new_channel";
+  esp_err_t err = i2s_new_channel(&channel, &txChannel, nullptr);
+  if (err == ESP_OK) {
+    stage = "i2s_channel_init_std_mode";
+    err = i2s_channel_init_std_mode(txChannel, &config);
+  }
+  if (err == ESP_OK) {
+    stage = "i2s_channel_enable";
+    err = i2s_channel_enable(txChannel);
+  }
+  if (err != ESP_OK && txChannel) {
+    i2s_del_channel(txChannel);
+    txChannel = nullptr;
+  }
+  xSemaphoreGive(i2sMutex);
+  return initializationOK(stage, err);
+#else
+  const i2s_config_t i2s_config = {
     .mode = static_cast<i2s_mode_t>(I2S_MODE_MASTER | I2S_MODE_TX),   // The main controller can transmit data but not receive.
     .sample_rate = _sampleRate,
     .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,   // 16 bits per sample
@@ -121,7 +238,7 @@ bool DFRobot_MAX98357A::initI2S(int _bclk, int _lrclk, int _din)
     .tx_desc_auto_clear = true
   };
 
-  static const i2s_pin_config_t pin_config = {
+  const i2s_pin_config_t pin_config = {
     .bck_io_num = _bclk,   // Serial clock (SCK), aka bit clock (BCK)
     .ws_io_num = _lrclk,   // Word select (WS), i.e. command (channel) select, used to switch between left and right channel data
     .data_out_num = _din,   // Serial data signal (SD), used to transmit audio data in two's complement format
@@ -134,63 +251,65 @@ bool DFRobot_MAX98357A::initI2S(int _bclk, int _lrclk, int _din)
   }
   if (i2s_set_pin(I2S_NUM_0, &pin_config)){
     DBG("Set I2S pin number failed !");
+    i2s_driver_uninstall(I2S_NUM_0);
     return false;
   }
 
   return true;
+#endif
 }
 
 bool DFRobot_MAX98357A::initBluetooth(const char * _btName)
 {
   // Initialize bluedroid
   if (!btStarted() && !btStart()){
-    DBG("Initialize controller failed");
+    Serial.println("[MAX98357A] Bluetooth controller start failed; check Bluetooth memory reservation and board/core selection.");
     return false;
   }
   esp_bluedroid_status_t bt_state = esp_bluedroid_get_status();
   if (bt_state == ESP_BLUEDROID_STATUS_UNINITIALIZED){
-    if (esp_bluedroid_init()) {
+    if (!initializationOK("esp_bluedroid_init", esp_bluedroid_init())) {
       DBG("Initialize bluedroid failed !");
       return false;
     }
   }
   if (bt_state != ESP_BLUEDROID_STATUS_ENABLED){
-    if (esp_bluedroid_enable()) {
+    if (!initializationOK("esp_bluedroid_enable", esp_bluedroid_enable())) {
       DBG("Enable bluedroid failed !");
       return false;
     }
   }
-  if (esp_bt_dev_set_device_name(_btName)){
+  if (!initializationOK("esp_bt_dev_set_device_name", esp_bt_dev_set_device_name(_btName))){
     DBG("Set device name failed !");
     return false;
   }
 
   // Initialize AVRCP
-  if (esp_avrc_ct_init()){
+  if (!initializationOK("esp_avrc_ct_init", esp_avrc_ct_init())){
     DBG("Initialize the bluetooth AVRCP controller module failed !");
     return false;
   }
-  if (esp_avrc_ct_register_callback(avrcCallback)){
+  if (!initializationOK("esp_avrc_ct_register_callback", esp_avrc_ct_register_callback(avrcCallback))){
     DBG("Register application callbacks to AVRCP module failed !");
     return false;
   }
 
   // Initialize A2DP
-  if (esp_a2d_sink_init()){
+  if (!initializationOK("esp_a2d_sink_init", esp_a2d_sink_init())){
     DBG("Initialize the bluetooth A2DP sink module failed !");
     return false;
   }
-  if (esp_a2d_register_callback(a2dpCallback)){
+  if (!initializationOK("esp_a2d_register_callback", esp_a2d_register_callback(a2dpCallback))){
     DBG("Register application callbacks to A2DP module failed !");
     return false;
   }
-  if (esp_a2d_sink_register_data_callback(audioDataProcessCallback)){
+  if (!initializationOK("esp_a2d_sink_register_data_callback", esp_a2d_sink_register_data_callback(audioDataProcessCallback))){
     DBG("Register A2DP sink data output function failed !");
     return false;
   }
 
   // Set discoverability and connectability mode for legacy bluetooth.
-  if (esp_bt_gap_set_scan_mode(ESP_BT_CONNECTABLE, ESP_BT_GENERAL_DISCOVERABLE)){
+  if (!initializationOK("esp_bt_gap_set_scan_mode", esp_bt_gap_set_scan_mode(ESP_BT_CONNECTABLE, ESP_BT_GENERAL_DISCOVERABLE))){
     DBG("Set discoverability and connectability mode for legacy bluetooth failed !");
     return false;
   }
@@ -356,7 +475,7 @@ void DFRobot_MAX98357A::setFilter(Biquad * _filter, int _type, float _fc)
 {
   _fc = (constrain(_fc, 2.0, 20000.0)) / (float)_sampleRate;   // Ratio of filter threshold to sampling frequency, range: 0.0-0.5
   float Q;
-  for(int i; i<NUMBER_OF_FILTER; i++){
+  for(int i = 0; i<NUMBER_OF_FILTER; i++){
     Q = 1 / (2 * cos( PI / (NUMBER_OF_FILTER * 4) + i * PI / (NUMBER_OF_FILTER * 2) ));
     DBG("\n-------- Q ");
     DBG(Q);
@@ -370,11 +489,11 @@ void DFRobot_MAX98357A::setFilter(Biquad * _filter, int _type, float _fc)
 
 int16_t DFRobot_MAX98357A::filterToWork(Biquad * filterHP, Biquad * filterLP, float rawData)
 {
-  for(int i; i<NUMBER_OF_FILTER; i++){
+  for(int i = 0; i<NUMBER_OF_FILTER; i++){
     rawData = filterLP[i].process(rawData);
   }
 
-  for(int i; i<NUMBER_OF_FILTER; i++){
+  for(int i = 0; i<NUMBER_OF_FILTER; i++){
     rawData = filterHP[i].process(rawData);
   }
 
@@ -496,7 +615,7 @@ void DFRobot_MAX98357A::audioDataProcessCallback(const uint8_t *data, uint32_t l
       DBG(processedData[1], HEX);
       data16++;
 
-      i2s_write(I2S_NUM_0,  processedData, 4, &i2s_bytes_write, 20);   // Transfer audio data to the amplifier via I2S
+      writeAudio(processedData, 4, &i2s_bytes_write, 20);   // Transfer audio data to the amplifier via I2S
     }
   }else{   // Filtering with a simple digital filter
     for(int i=0; i<count; i++){
@@ -506,7 +625,7 @@ void DFRobot_MAX98357A::audioDataProcessCallback(const uint8_t *data, uint32_t l
       processedData[1-_voiceSource] = filterToWork(_filterRHP, _filterRLP, ((*data16) * _volume));   // Change audio data volume of right channel, and perform filtering operation
       data16++;
 
-      i2s_write(I2S_NUM_0, processedData, 4, &i2s_bytes_write, 100);   // Transfer audio data to the amplifier via I2S
+      writeAudio(processedData, 4, &i2s_bytes_write, 100);   // Transfer audio data to the amplifier via I2S
     }
   }
 }
@@ -585,7 +704,14 @@ void DFRobot_MAX98357A::playWAV(void *arg)
       }
     }
 
-    i2s_set_sample_rates(I2S_NUM_0, wav->header.sampleRate);   // Set I2S sampling rate based on the parsed audio sampling frequency
+    // Set I2S sampling rate from the WAV header.
+    if (setAudioSampleRate(wav->header.sampleRate) != ESP_OK) {
+      DBG("Set I2S sample rate failed !");
+      fclose(wav->fp);
+      free(wav);
+      SDAmplifierMark = SD_AMPLIFIER_STOP;
+      continue;
+    }
 
     while(fread(&wav->header.data, 1 , 800 , wav->fp)){
       audioDataProcessCallback((uint8_t *)&wav->header.data, 800);   // Send the parsed audio data to the amplifier broadcast function

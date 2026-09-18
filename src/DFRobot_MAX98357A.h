@@ -21,7 +21,12 @@
 #include <esp_a2dp_api.h>
 #include "esp_avrc_api.h"
 
+#include <esp_idf_version.h>
+#if ESP_IDF_VERSION_MAJOR >= 5
+#include <driver/i2s_std.h>
+#else
 #include <driver/i2s.h>
+#endif
 
 #include "Biquad.h"   // Code from https://www.earlevel.com/main/2012/11/26/biquad-c-source-code/ . Thank you very much!
 

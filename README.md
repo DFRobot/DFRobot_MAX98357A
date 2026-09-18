@@ -27,6 +27,12 @@ This is a small and easy-to-use MAX98357A I2S amplifier. In combination with ESP
 * With onboard I2S amplifier, 3W power, and good sound quality.
 
 
+## Arduino-ESP32 compatibility
+
+On the original ESP32, this library uses the ESP-IDF 5 I2S channel driver with Arduino-ESP32 3.x and retains the legacy I2S driver with 2.x. The `begin(btName, bclk, lrclk, din)` API is unchanged. Recent cores require the library to declare Bluetooth Classic usage before startup so its memory is not released before `setup()`.
+
+The full Bluetooth amplifier sketch builds with Arduino-ESP32 3.3.11 for ESP32 Dev Module, and operation was confirmed on ESP32-D0WD-V3 hardware. The I2S migration was also compiled with 2.0.17 before the final startup diagnostics were added. ESP32-C3/S3 do not support Bluetooth Classic A2DP. Bluetooth output still uses the original fixed 44.1 kHz sample rate; SD playback has not been revalidated.
+
 ## Installation
 
 To use this library, first download the library file, paste it into the \Arduino\libraries directory, then open the examples folder and run the demo in the folder.
