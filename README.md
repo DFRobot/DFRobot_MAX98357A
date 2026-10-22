@@ -177,6 +177,7 @@ FireBeetle-ESP32   |      √       |              |             |
 
 - 2022/02/07 - Version 1.0.0 released.
 - 2022/09/21 - Version 1.0.1 released.
+- 2026/10/22 - Version 1.0.2 released. Initialize the loop index in setFilter() and filterToWork(), fixing out-of-bounds array access (e.g. crash on ESP32).
 
 
 ## Credits
